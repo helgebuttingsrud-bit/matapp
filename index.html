@@ -43,6 +43,7 @@
   label:first-child { margin-top: 0; }
   input[type=text], input[type=date], input[type=number] { width: 100%; font: inherit; padding: 13px 12px;
     border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
+  input[type=date] { -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; min-height: 50px; text-align: left; }
   .sub { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
   .meta { color: var(--muted); font-size: 13px; margin-top: 4px; min-height: 18px; }
 
@@ -86,6 +87,7 @@
 <section id="scan">
   <div id="reader"></div>
   <p class="hint" id="hint">Hold strekkoden foran kameraet.</p>
+  <button class="ghost" id="typecode">Skriv inn strekkoden</button>
   <button class="ghost" id="manual">Legg inn uten strekkode</button>
 </section>
 
@@ -188,13 +190,24 @@ async function startScan() {
         verbose: false
       });
     }
-    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 280, height: 140 } }, onScan, () => {});
+    const w = Math.min(340, Math.floor(($('reader').clientWidth || 320) * 0.9));
+    await scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 15,
+        qrbox: { width: w, height: 160 },
+        videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+      },
+      onScan, () => {}
+    );
+    setMode(mode); // nullstill hjelpetekst
   } catch (e) {
+    $('hint').textContent = 'Kameraet startet ikke: ' + (e && e.message ? e.message : e);
     toast('Fikk ikke tilgang til kamera. Sjekk tillatelser i Safari.', true);
   }
 }
 async function stopScan() {
-  try { if (scanner && scanner.isScanning) await scanner.stop(); } catch (e) {}
+  try { if (scanner) await scanner.stop(); } catch (e) { /* ikke i gang */ }
 }
 
 async function onScan(code) {
@@ -278,6 +291,10 @@ $('bb').onchange = validate;
 
 $('cancel').onclick = startScan;
 $('manual').onclick = async () => { await stopScan(); handleAdd(''); };
+$('typecode').onclick = () => {
+  const c = (prompt('Skriv inn tallene under strekkoden:') || '').replace(/\D/g, '');
+  if (c) onScan(c);
+};
 
 $('save').onclick = async () => {
   $('save').disabled = true;
